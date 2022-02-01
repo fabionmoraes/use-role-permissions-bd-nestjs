@@ -6,7 +6,7 @@ import {
   HttpException,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
-import { NextPermission } from 'role-permissions-bd';
+import { NextPermission, UserRoles } from 'role-permissions-bd';
 
 @Injectable()
 export class PermissionsInterceptor implements NestInterceptor {
@@ -18,7 +18,7 @@ export class PermissionsInterceptor implements NestInterceptor {
 
     const passed = NextPermission({
       request,
-      userRoles: user.roles,
+      userRoles: UserRoles(user.user_roles),
     });
 
     if (passed) {

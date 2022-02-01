@@ -10,7 +10,7 @@ export class RolesService {
 
   async findOne(id: number): Promise<Role | null> {
     try {
-      const result = await this.prisma.role.findUnique({
+      const result = await this.prisma.role.findFirst({
         where: { id },
       });
 

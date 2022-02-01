@@ -13,8 +13,15 @@ export class UsersService {
 
   async findOne(id: string): Promise<User | null> {
     try {
-      const result = await this.prisma.user.findUnique({
+      const result = await this.prisma.user.findFirst({
         where: { id },
+        include: {
+          user_roles: {
+            include: {
+              role: true,
+            },
+          },
+        },
       });
 
       return result;
