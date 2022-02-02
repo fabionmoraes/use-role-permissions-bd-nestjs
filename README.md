@@ -1,73 +1,264 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo_text.svg" width="320" alt="Nest Logo" /></a>
-</p>
+# role-permissions-bd - Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+## express Compatibility
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+Role Permissions é testado e tem total compatibilidade com express 4x.
 
-## Description
+## O que a lib faz?
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+A Lib retorna de uma forma fácil as permissões de todas as rotas Express
 
-## Installation
+## Para utilizar precisa?
+
+- No banco de dados precisa ter as tabelas:
+  --users[..info]
+  --roles["name: string", "permissions: string"] // Aqui vai ser criado o perfil de permissão de acordo com a rota criada.
+  --user_roles["user_id: string | number", "user_role_id: string | number"]
+
+## Instalação
 
 ```bash
-$ npm install
+yarn add role-permissions-bd
+# or
+npm i role-permissions-bd --save
 ```
 
-## Running the app
+## Link da Library
 
-```bash
-# development
-$ npm run start
+A Lib carrega os dados que vem do backend em um formato e mostra em tela para criar e editar.
+Open [role-permissions-bd](https://www.npmjs.com/package/role-permissions-bd)
 
-# watch mode
-$ npm run start:dev
+## Funcionalidades
 
-# production mode
-$ npm run start:prod
+### exclude
+
+- O exclude vai retirar a rota que você deseja. Por ex.: ['users', 'roles'] O users e roles serão exluido
+
+```ts
+AllRouters(req, { exlude: ['users', 'roles'] });
 ```
 
-## Test
+### exclude_prefix
 
-```bash
-# unit tests
-$ npm run test
+- O exclude_prefix vai retirar o prefix da url que foi configurado ex.: http.../api { exclude_prefix: 'api } retira
 
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+```ts
+AllRouters(req, { exclude_prefix: 'api' });
 ```
 
-## Support
+## Utilização da Library NestJS
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+### Example Use Code
 
-## Stay in touch
+Open [Segue Exemplo do NestJS](https://github.com/fabionmoraes/use-role-permissions-bd-nestjs)
 
-- Author - [Kamil Myśliwiec](https://kamilmysliwiec.com)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+### Interceptors
 
-## License
+```ts
+import {
+  Injectable,
+  NestInterceptor,
+  ExecutionContext,
+  CallHandler,
+  HttpException,
+} from "@nestjs/common";
+import { Observable } from "rxjs";
+import { NextPermission, UserRoles } from "role-permissions-bd";
 
-Nest is [MIT licensed](LICENSE).
+@Injectable()
+export class PermissionsInterceptor implements NestInterceptor {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    const ctx = context.switchToHttp();
+    const request = ctx.getRequest();
+
+    const user: any = request.user; // Na documentação do auth NestJS ele armazena o user no request
+
+    const passed = NextPermission({
+      request,
+      userRoles: UserRoles(user.user_roles), // Aqui pega a roles do usuário user_roles com relacionamento role
+    });
+
+    if (passed) {
+      return next.handle();
+    }
+
+    throw new HttpException(...);
+  }
+}
+```
+
+### Controllers
+
+```ts
+...
+import { AllRouters, Permissions, Permission } from 'role-permissions-bd'
+
+@UseGuards(JwtAuthGuard) // Authenticação do proprio NestJS
+@UseInterceptors(PermissionsInterceptor) // Utilização do Interceptors do NestJS
+@Controllers('roles')
+export class RolesController {
+    constructor(...) {}
+
+    @Get('/todo')
+    async findAll() {
+        const roles = await this.rolesService.findAll()
+        return Permissions(req, { roles })
+
+        // Retorno será uma junção das roles que já existe no seu banco com a permissão de cada rota
+        // [
+        //     {
+        //         "id": 8,
+        //         "name": "Suporte",
+        //         "slug": "suporte",
+        //         "permissions": [
+        //             {
+        //                 "name": "roles",
+        //                 "permissions": {
+        //                     "GET": true,// ... visualizar
+        //                     "POST": true, // Usuário tem permissão de criar
+        //                     "UPDATE": true, // ... alterar
+        //                     "DELETE": false
+        //                 }
+        //             },
+        //             {
+        //                 "name": "countries",
+        //                 "permissions": {
+        //                     "GET": false
+        //                 }
+        //             },
+        //         ],
+        //         "created_at": "2022-01-27T19:32:23.855Z",
+        //         "updated_at": "2022-01-27T19:32:23.855Z",
+        //         "deleted_at": null
+        //     }
+        // ]
+    }
+
+    @Get('/one')
+    findAllRoutes(@Request() req) {
+        const role = await this.rolesService.findOne(...)
+        return Permissions(req, { role, exclude: ['roles'] }) //exclude retira a rota roles para visualizar não sendo obrigatório
+    }
+
+    @Get('/routes')
+    findAllRoutes(@Request() req) {
+        return AllRouters(req) // Aqui Retorna todas rotas como tudo false do exemplo acima
+    }
+}
+```
+
+## Utilização da Library NodeJS
+
+### Middleware
+
+```ts
+//src/middleware/handle
+import { Request, Response, NextFunction } from 'express';
+import { container } from 'tsyringe';
+import { NextPermission } from 'role-permissions-bd';
+
+import { AppError } from '@config/AppError';
+import { jwtVerify } from '@config/jwt';
+import { FindOneUserByIdService } from '@modules/users/services/FindOneUserByIdService';
+
+export default class RolePermissionsMiddleware {
+  async handle(request: Request, response: Response, next: NextFunction) {
+    const findOneUserByIdService = container.resolve(FindOneUserByIdService);
+
+    const authToken = request.headers.authorization;
+
+    const [, token] = authToken.split(' ');
+
+    const { sub } = jwtVerify(token);
+
+    const user = await findOneUserByIdService.execute(sub);
+
+    const passed = NextPermission({
+      request,
+      userRoles: user.roles,
+    });
+
+    if (passed) {
+      return next();
+    }
+
+    throw new AppError('Not Permission', 403);
+  }
+}
+
+//src/middleware/index
+
+import EnsureAuthenticated from './handle/ensureAuthenticated';
+import RolePermissions from './handle/rolePermissions';
+
+const ensureAuthenticated = new EnsureAuthenticated().handle;
+const rolePermissionsMiddleware = new RolePermissions().handle;
+
+export { rolePermissionsMiddleware, ensureAuthenticated };
+```
+
+### Controllers
+
+```ts
+import { Request, Response } from 'express';
+
+import { AllRouters, Permissions, Permission } from 'role-permissions-bd';
+import { container } from 'tsyringe';
+
+import { FindOneRoleByIdService } from '@modules/roles/services/FindOneRoleByIdService';
+import { FindAllRoleService } from '@modules/roles/services/FindAllRoleService';
+
+export class PermissionsController {
+  async findAllRouters(request: Request, response: Response) {
+    return response.json(
+      AllRouters(request, { exclude: ['permissions', 'auth'] }),
+    );
+  }
+
+  async findOneRole(request: Request, response: Response) {
+    const { id } = request.params;
+
+    try {
+      const findOneRoleByIdService = container.resolve(FindOneRoleByIdService);
+      const role = await findOneRoleByIdService.execute(+id);
+
+      return response.json(Permission(request, { role }));
+    } catch (err: any) {
+      return response.sendError(err.message);
+    }
+  }
+
+  async findAllTools(request: Request, response: Response) {
+    const findAllRoleService = container.resolve(FindAllRoleService);
+
+    try {
+      const roles = await findAllRoleService.execute();
+
+      return response.json(
+        Permissions(request, { roles, exclude: ['permissions', 'auth'] }),
+      );
+    } catch (err: any) {
+      return response.sendError(err.message);
+    }
+  }
+}
+```
+
+### Routes
+
+```ts
+import { Router } from 'express';
+import { ensureAuthenticated } from 'middleware';
+import { PermissionsController } from './PermissionsController';
+
+const permissionsRoutes = Router();
+const permissionsController = new PermissionsController();
+
+// permissionsRoutes.use(ensureAuthenticated)
+
+permissionsRoutes.get('/routes', permissionsController.findAllRouters);
+permissionsRoutes.get('/roles', permissionsController.findAllTools);
+permissionsRoutes.get('/roles/:id', permissionsController.findOneRole);
+
+export { permissionsRoutes };
+```

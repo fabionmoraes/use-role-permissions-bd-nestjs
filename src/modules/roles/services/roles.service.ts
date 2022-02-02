@@ -9,15 +9,15 @@ export class RolesService {
   constructor(private prisma: PrismaClient) {}
 
   async findOne(id: number): Promise<Role | null> {
-    try {
-      const result = await this.prisma.role.findFirst({
-        where: { id },
-      });
+    const result = await this.prisma.role.findUnique({
+      where: { id },
+    });
 
-      return result;
-    } catch (err: any) {
-      throw new HttpException(err.message, 400);
+    if (!result) {
+      throw new HttpException('Ops! Role não encontrado.', 400);
     }
+
+    return result;
   }
 
   async findAll(): Promise<Role[]> {
